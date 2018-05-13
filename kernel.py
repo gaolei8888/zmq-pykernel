@@ -11,7 +11,6 @@ Things to do:
 * Implement event loop and poll version.
 """
 
-import __builtin__
 import sys
 import time
 import traceback
@@ -22,6 +21,7 @@ import zmq
 
 from session import Session, Message, extract_header
 from completer import KernelCompleter
+
 
 class OutStream(object):
     """A file like object that publishes the stream to a 0MQ PUB socket."""
@@ -50,7 +50,7 @@ class OutStream(object):
                 content = {u'name':self.name, u'data':data}
                 msg = self.session.msg(u'stream', content=content,
                                        parent=self.parent_header)
-                print>>sys.__stdout__, Message(msg)
+                print(sys.__stdout__, Message(msg))
                 self.pub_socket.send_json(msg)
                 self._buffer_len = 0
                 self._buffer = []
@@ -99,7 +99,7 @@ class DisplayHook(object):
         if obj is None:
             return
 
-        __builtin__._ = obj
+        # __builtin__._ = obj
         msg = self.session.msg(u'pyout', {u'data':repr(obj)},
                                parent=self.parent_header)
         self.pub_socket.send_json(msg)
@@ -120,7 +120,7 @@ class RawInput(object):
         while True:
             try:
                 reply = self.socket.recv_json(zmq.NOBLOCK)
-            except zmq.ZMQError, e:
+            except zmq.ZMQError as e:
                 if e.errno == zmq.EAGAIN:
                     pass
                 else:
@@ -150,18 +150,18 @@ class Kernel(object):
         while True:
             try:
                 ident = self.reply_socket.recv(zmq.NOBLOCK)
-            except zmq.ZMQError, e:
+            except zmq.ZMQError as e:
                 if e.errno == zmq.EAGAIN:
                     break
             else:
                 assert self.reply_socket.rcvmore(), "Unexpected missing message part."
                 msg = self.reply_socket.recv_json()
-            print>>sys.__stdout__, "Aborting:"
-            print>>sys.__stdout__, Message(msg)
+            print(sys.__stdout__, "Aborting:")
+            print(sys.__stdout__, Message(msg))
             msg_type = msg['msg_type']
             reply_type = msg_type.split('_')[0] + '_reply'
             reply_msg = self.session.msg(reply_type, {'status' : 'aborted'}, msg)
-            print>>sys.__stdout__, Message(reply_msg)
+            print(sys.__stdout__, Message(reply_msg))
             self.reply_socket.send(ident,zmq.SNDMORE)
             self.reply_socket.send_json(reply_msg)
             # We need to wait a bit for requests to come in. This can probably
@@ -172,15 +172,15 @@ class Kernel(object):
         try:
             code = parent[u'content'][u'code']
         except:
-            print>>sys.__stderr__, "Got bad msg: "
-            print>>sys.__stderr__, Message(parent)
+            print(sys.__stderr__, "Got bad msg: ")
+            print(sys.__stderr__, Message(parent))
             return
         pyin_msg = self.session.msg(u'pyin',{u'code':code}, parent=parent)
         self.pub_socket.send_json(pyin_msg)
         try:
             comp_code = self.compiler(code, '<zmq-kernel>')
             sys.displayhook.set_parent(parent)
-            exec comp_code in self.user_ns, self.user_ns
+            exec(comp_code in self.user_ns, self.user_ns)
         except:
             result = u'error'
             etype, evalue, tb = sys.exc_info()
@@ -188,8 +188,8 @@ class Kernel(object):
             exc_content = {
                 u'status' : u'error',
                 u'traceback' : tb,
-                u'etype' : unicode(etype),
-                u'evalue' : unicode(evalue)
+                u'etype' : etype,
+                u'evalue' : evalue
             }
             exc_msg = self.session.msg(u'pyerr', exc_content, parent)
             self.pub_socket.send_json(exc_msg)
@@ -236,8 +236,8 @@ def main():
     rep_conn = connection % port_base
     pub_conn = connection % (port_base+1)
 
-    print >>sys.__stdout__, "Starting the kernel..."
-    print >>sys.__stdout__, "On:",rep_conn, pub_conn
+    print(sys.__stdout__, "Starting the kernel...")
+    print(sys.__stdout__, "On:",rep_conn, pub_conn)
 
     session = Session(username=u'kernel')
 
@@ -262,8 +262,9 @@ def main():
     kernel.user_ns['sleep'] = time.sleep
     kernel.user_ns['s'] = 'Test string'
     
-    print >>sys.__stdout__, "Use Ctrl-\\ (NOT Ctrl-C!) to terminate."
+    print(sys.__stdout__, "Use Ctrl-\\ (NOT Ctrl-C!) to terminate.")
     kernel.start()
+    print("Kernel started")
 
 
 if __name__ == '__main__':
